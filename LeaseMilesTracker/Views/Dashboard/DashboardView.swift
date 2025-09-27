@@ -3,30 +3,42 @@ import SwiftData
 
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var settings: [LeaseSettings]
-    @Query private var entries: [MileageEntry]
+    @Query private var cars: [Car]
     @State private var showingAddEntry = false
     @State private var showingOnboarding = false
     @State private var showingNotificationTest = false
+    @State private var showingCarSelection = false
     
-    private var settingsStore: LeaseSettingsStore {
-        LeaseSettingsStore(modelContext: modelContext)
+    private var carStore: CarStore {
+        CarStore(modelContext: modelContext)
     }
     
     private var mileageStore: MileageStore {
         MileageStore(modelContext: modelContext)
     }
     
+    private var activeCar: Car? {
+        cars.first { $0.isActive }
+    }
+    
+    private var entriesForActiveCar: [MileageEntry] {
+        guard let activeCar = activeCar else { return [] }
+        return mileageStore.loadEntries(for: activeCar)
+    }
+    
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 16) {
-                    if let leaseSettings = settings.first {
-                        let snapshot = LeaseCalculator.calculateSnapshot(settings: leaseSettings, entries: entries)
+                    if let activeCar = activeCar {
+                        let snapshot = LeaseCalculator.calculateSnapshot(settings: activeCar.leaseSettings, entries: entriesForActiveCar)
+                        
+                        // Car Header
+                        carHeaderView(activeCar)
                         
                         // Warning Banner
-                        if LeaseCalculator.shouldShowWarning(settings: leaseSettings, snapshot: snapshot) {
-                            warningBanner(snapshot: snapshot, settings: leaseSettings)
+                        if LeaseCalculator.shouldShowWarning(settings: activeCar.leaseSettings, snapshot: snapshot) {
+                            warningBanner(snapshot: snapshot, settings: activeCar.leaseSettings)
                         }
                         
                         // Metric Cards
@@ -37,7 +49,7 @@ struct DashboardView: View {
                             MetricCard(
                                 title: "Miles Driven",
                                 value: snapshot.milesDriven.formatted,
-                                subtitle: "of \(leaseSettings.allowedMilesTotal.formatted)",
+                                subtitle: "of \(activeCar.allowedMilesTotal.formatted)",
                                 icon: "road.lanes",
                                 color: .blue
                             )
@@ -97,12 +109,23 @@ struct DashboardView: View {
                         }
                         
                         Spacer(minLength: 100)
+                    } else {
+                        // No active car state
+                        noCarStateView
                     }
                 }
                 .padding()
             }
             .navigationTitle("Dashboard")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        showingCarSelection = true
+                    } label: {
+                        Image(systemName: "car.circle.fill")
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack {
                         Button {
@@ -111,34 +134,102 @@ struct DashboardView: View {
                             Image(systemName: "bell.badge")
                         }
                         
-                        Button {
-                            showingAddEntry = true
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
+                        if activeCar != nil {
+                            Button {
+                                showingAddEntry = true
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                            }
                         }
                     }
                 }
             }
             .sheet(isPresented: $showingAddEntry) {
-                AddEntryView()
+                if let activeCar = activeCar {
+                    AddEntryView(car: activeCar)
+                }
             }
             .sheet(isPresented: $showingNotificationTest) {
                 NotificationTestView()
             }
+            .sheet(isPresented: $showingCarSelection) {
+                CarSelectionView()
+            }
             .onAppear {
-                if settings.isEmpty {
-                    showingOnboarding = true
-                } else {
-                    // Update widget data when dashboard appears
-                    if let leaseSettings = settings.first {
-                        SharedDataManager.shared.updateWidgetData(settings: leaseSettings, entries: entries)
-                    }
+                // Migrate from old data if needed
+                carStore.migrateFromOldData()
+                
+                // Update widget data when dashboard appears
+                if let activeCar = activeCar {
+                    SharedDataManager.shared.updateWidgetData(settings: activeCar.leaseSettings, entries: entriesForActiveCar)
                 }
             }
-            .sheet(isPresented: $showingOnboarding) {
-                OnboardingView()
+        }
+    }
+    
+    private func carHeaderView(_ car: Car) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "car.circle.fill")
+                    .foregroundColor(.blue)
+                    .font(.title2)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(car.displayName)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    if let make = car.make, let model = car.model {
+                        Text("\(car.year.map { "\($0) " } ?? "")\(make) \(model)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                Text("Active")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.blue)
+                    .cornerRadius(6)
             }
         }
+        .padding()
+        .background(Color.blue.opacity(0.1))
+        .cornerRadius(12)
+    }
+    
+    private var noCarStateView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "car.circle")
+                .font(.system(size: 80))
+                .foregroundColor(.gray)
+            
+            Text("No Active Car")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            Text("Select a car from your garage to view the dashboard")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            
+            Button {
+                showingCarSelection = true
+            } label: {
+                Text("Manage Cars")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(Color.blue)
+                    .cornerRadius(12)
+            }
+        }
+        .padding()
     }
     
     private func warningBanner(snapshot: LeaseSnapshot, settings: LeaseSettings) -> some View {

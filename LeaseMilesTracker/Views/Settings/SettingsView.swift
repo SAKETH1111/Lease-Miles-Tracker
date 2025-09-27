@@ -3,7 +3,7 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var settings: [LeaseSettings]
+    @Query private var cars: [Car]
     @StateObject private var notificationManager = NotificationManager.shared
     
     @State private var leaseStartDate = Date()
@@ -18,14 +18,27 @@ struct SettingsView: View {
     @State private var showingAlert = false
     @State private var alertMessage = ""
     
-    private var settingsStore: LeaseSettingsStore {
-        LeaseSettingsStore(modelContext: modelContext)
+    private var carStore: CarStore {
+        CarStore(modelContext: modelContext)
+    }
+    
+    private var activeCar: Car? {
+        cars.first { $0.isActive }
     }
     
     var body: some View {
         NavigationView {
             Form {
-                if let leaseSettings = settings.first {
+                if let activeCar = activeCar {
+                    Section("Active Car") {
+                        HStack {
+                            Image(systemName: "car.circle.fill")
+                                .foregroundColor(.blue)
+                            Text(activeCar.displayName)
+                                .font(.headline)
+                        }
+                    }
+                    
                     Section("Lease Details") {
                         DatePicker("Lease Start Date", selection: $leaseStartDate, displayedComponents: .date)
                         DatePicker("Lease End Date", selection: $leaseEndDate, displayedComponents: .date)
@@ -76,13 +89,27 @@ struct SettingsView: View {
                     }
                     
                     Section("Danger Zone") {
-                        Button("Reset All Data", role: .destructive) {
+                        Button("Reset This Car's Data", role: .destructive) {
                             showingResetAlert = true
                         }
                     }
                 } else {
                     Section {
-                        Text("No settings found. Please restart the app.")
+                        VStack(spacing: 16) {
+                            Image(systemName: "car.circle")
+                                .font(.system(size: 60))
+                                .foregroundColor(.secondary)
+                            
+                            Text("No Active Car")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                            
+                            Text("Select a car from your garage to manage its settings")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding()
                     }
                 }
             }
@@ -95,13 +122,13 @@ struct SettingsView: View {
             } message: {
                 Text(alertMessage)
             }
-            .alert("Reset All Data", isPresented: $showingResetAlert) {
+            .alert("Reset Car Data", isPresented: $showingResetAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Reset", role: .destructive) {
-                    resetAllData()
+                    resetCarData()
                 }
             } message: {
-                Text("This will delete all your lease settings and mileage entries. This action cannot be undone.")
+                Text("This will delete all mileage entries for the active car. This action cannot be undone.")
             }
         }
     }
@@ -117,20 +144,21 @@ struct SettingsView: View {
     }
     
     private func loadCurrentSettings() {
-        guard let leaseSettings = settings.first else { return }
+        guard let activeCar = activeCar else { return }
         
-        leaseStartDate = leaseSettings.leaseStartDate
-        leaseEndDate = leaseSettings.leaseEndDate
-        startingOdometer = String(leaseSettings.startingOdometer)
-        allowedMilesTotal = String(leaseSettings.allowedMilesTotal)
-        costPerMile = String(describing: leaseSettings.costPerMile)
-        reminderDayOfMonth = leaseSettings.reminderDayOfMonth.map(String.init) ?? ""
-        lowMilesThresholdPercent = String(leaseSettings.lowMilesThresholdPercent)
-        isNotificationEnabled = leaseSettings.reminderDayOfMonth != nil
+        leaseStartDate = activeCar.leaseStartDate
+        leaseEndDate = activeCar.leaseEndDate
+        startingOdometer = String(activeCar.startingOdometer)
+        allowedMilesTotal = String(activeCar.allowedMilesTotal)
+        costPerMile = String(describing: activeCar.costPerMile)
+        reminderDayOfMonth = activeCar.reminderDayOfMonth.map(String.init) ?? ""
+        lowMilesThresholdPercent = String(activeCar.lowMilesThresholdPercent)
+        isNotificationEnabled = activeCar.reminderDayOfMonth != nil
     }
     
     private func saveSettings() {
-        guard let startingOdometerInt = Int(startingOdometer),
+        guard let activeCar = activeCar,
+              let startingOdometerInt = Int(startingOdometer),
               let allowedMilesTotalInt = Int(allowedMilesTotal),
               let costPerMileDouble = Double(costPerMile),
               leaseEndDate > leaseStartDate else {
@@ -148,15 +176,16 @@ struct SettingsView: View {
             return
         }
         
-        settingsStore.updateSettings(
-            leaseStartDate: leaseStartDate,
-            leaseEndDate: leaseEndDate,
-            startingOdometer: startingOdometerInt,
-            allowedMilesTotal: allowedMilesTotalInt,
-            costPerMile: Decimal(costPerMileDouble),
-            reminderDayOfMonth: reminderDay,
-            lowMilesThresholdPercent: thresholdPercent
-        )
+        // Update the active car's settings
+        activeCar.leaseStartDate = leaseStartDate
+        activeCar.leaseEndDate = leaseEndDate
+        activeCar.startingOdometer = startingOdometerInt
+        activeCar.allowedMilesTotal = allowedMilesTotalInt
+        activeCar.costPerMile = Decimal(costPerMileDouble)
+        activeCar.reminderDayOfMonth = reminderDay
+        activeCar.lowMilesThresholdPercent = thresholdPercent
+        
+        carStore.updateCar(activeCar)
         
         // Update notification scheduling
         if isNotificationEnabled, let day = reminderDay {
@@ -168,8 +197,16 @@ struct SettingsView: View {
         }
     }
     
-    private func resetAllData() {
-        settingsStore.resetData()
+    private func resetCarData() {
+        guard let activeCar = activeCar else { return }
+        
+        // Delete all mileage entries for this car
+        let mileageStore = MileageStore(modelContext: modelContext)
+        let entries = mileageStore.loadEntries(for: activeCar)
+        for entry in entries {
+            mileageStore.deleteEntry(entry)
+        }
+        
         notificationManager.cancelAllReminders()
     }
 }
