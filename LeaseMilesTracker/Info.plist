@@ -62,5 +62,19 @@
 	</array>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>This app sends reminders to update your odometer reading and alerts when you're approaching your lease mileage limit.</string>
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>group.com.leasemilestracker.shared</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>Lease Miles Tracker Shared</string>
+		</dict>
+	</dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.leasemilestracker.shared</string>
+	</array>
 </dict>
 </plist>

@@ -43,32 +43,56 @@ A comprehensive iOS app built with SwiftUI and SwiftData for tracking lease mile
 ```
 LeaseMilesTracker/
 ├── LeaseMilesTrackerApp.swift          # Main app entry point
+├── ContentView.swift                   # Main content view with tab navigation
 ├── Models/
+│   ├── Car.swift                       # Car model with lease settings
 │   ├── LeaseSettings.swift             # Singleton lease configuration
 │   └── MileageEntry.swift              # Individual odometer readings
 ├── Services/
 │   ├── LeaseCalculator.swift           # Pure calculation logic
 │   ├── NotificationManager.swift       # Local notification handling
-│   └── CSVExporter.swift               # CSV export functionality
+│   ├── CSVExporter.swift               # CSV export functionality
+│   └── QuickActionsManager.swift       # Home screen quick actions
 ├── Stores/
+│   ├── CarStore.swift                  # Car management and persistence
 │   ├── LeaseSettingsStore.swift        # Settings persistence
 │   └── MileageStore.swift              # Mileage entries persistence
+├── Shared/
+│   └── SharedDataManager.swift         # App Groups data sharing
 ├── Views/
 │   ├── Onboarding/
 │   │   └── OnboardingView.swift        # First-time setup
 │   ├── Dashboard/
 │   │   ├── DashboardView.swift         # Main metrics display
 │   │   └── MetricCard.swift            # Reusable metric component
+│   ├── Charts/
+│   │   └── MileageChartsView.swift     # Swift Charts analytics
 │   ├── Entries/
 │   │   ├── AddEntryView.swift          # New odometer entry
 │   │   ├── EditEntryView.swift         # Edit existing entry
 │   │   └── HistoryView.swift           # Entry history with export
-│   └── Settings/
-│       └── SettingsView.swift          # Configuration management
+│   ├── Cars/
+│   │   ├── AddCarView.swift            # Add new car
+│   │   ├── CarSelectionView.swift      # Car management
+│   │   └── EditCarView.swift           # Edit car details
+│   ├── Settings/
+│   │   └── SettingsView.swift          # Configuration management
+│   └── Testing/
+│       └── NotificationTestView.swift  # Notification testing interface
+├── Widget/
+│   ├── LeaseMilesWidget.swift          # Main widget implementation
+│   ├── LeaseMilesWidgetBundle.swift    # Widget bundle
+│   ├── LeaseMilesWidgetConfiguration.swift # Widget configuration
+│   └── InteractiveWidget.swift         # Interactive widget with buttons
 ├── Utils/
 │   └── Formatters.swift                # Number and date formatting
 └── Tests/
-    └── LeaseCalculatorTests.swift      # Unit tests for calculations
+    ├── LeaseCalculatorTests.swift      # Unit tests for calculations
+    ├── NotificationManagerTests.swift  # Notification tests
+    ├── SharedDataManagerTests.swift    # Widget data tests
+    ├── WidgetTests.swift               # Widget functionality tests
+    └── UI/
+        └── LeaseMilesTrackerUITests.swift # UI automation tests
 ```
 
 ## Key Components
@@ -157,14 +181,42 @@ xcodebuild test -scheme LeaseMilesTracker -destination 'platform=iOS Simulator,n
 - **High Contrast**: Proper contrast ratios throughout
 - **SF Symbols**: Consistent iconography
 
+## New Features (Latest Version)
+
+### 🎯 **Interactive Widgets**
+- **Quick Actions**: Add entries, view history, and access settings directly from widgets
+- **Multiple Widget Sizes**: Small, medium, and large widgets with customizable content
+- **Real-time Updates**: Widgets update automatically with your latest data
+- **Configuration Options**: Customize what information is displayed
+
+### 📊 **Advanced Charts & Analytics**
+- **Miles Over Time**: Visual timeline of your mileage progression
+- **Daily Averages**: Bar charts showing daily mileage patterns
+- **Projected Trends**: Forecast your mileage at lease end
+- **Multiple Time Ranges**: 1 month, 3 months, 6 months, 1 year, or all time
+- **Summary Statistics**: Key metrics and insights
+
+### ⚡ **Quick Actions**
+- **Home Screen Shortcuts**: Long-press app icon for quick access
+- **Add Entry**: Jump directly to adding a new mileage entry
+- **View Dashboard**: Quick access to your lease status
+- **View History**: Instantly see your mileage history
+- **View Charts**: Access analytics and trends
+
+### 🔧 **Enhanced Widget Configuration**
+- **Display Styles**: Compact, detailed, or minimal layouts
+- **Customizable Content**: Show/hide projected overage, months left, running cost
+- **Interactive Buttons**: Direct actions from widget interface
+- **Smart Updates**: Automatic refresh every hour
+
 ## Future Enhancements
 
 Potential additions for future versions:
-- **Widgets**: Home screen widgets for quick mileage viewing
-- **Charts**: Visual mileage trends using Swift Charts
-- **Quick Actions**: Home screen shortcuts for adding entries
-- **Multiple Leases**: Support for tracking multiple vehicles
-- **iCloud Sync**: Optional cloud synchronization
+- **Apple Watch**: Widget complications for quick glances
+- **Multiple Leases**: Support for tracking multiple vehicles simultaneously
+- **iCloud Sync**: Optional cloud synchronization across devices
+- **Advanced Analytics**: More detailed reporting and insights
+- **Export Options**: Additional export formats (PDF, Excel)
 
 ## License
 

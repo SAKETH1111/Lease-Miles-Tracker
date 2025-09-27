@@ -7,7 +7,7 @@ struct LeaseMilesWidget: Widget {
 
     var body: some WidgetConfiguration {
         IntentConfiguration(kind: kind, intent: LeaseMilesWidgetConfiguration.self, provider: LeaseMilesProvider()) { entry in
-            LeaseMilesWidgetEntryView(entry: entry)
+            LeaseMilesWidgetEntryView(entry: entry, configuration: entry.configuration)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("Lease Miles Tracker")
@@ -24,17 +24,18 @@ struct LeaseMilesProvider: TimelineProvider {
             remainingMiles: 21000,
             monthsLeft: 18,
             projectedOverage: 0,
-            isDataAvailable: true
+            isDataAvailable: true,
+            configuration: nil
         )
     }
 
     func getSnapshot(in context: Context, completion: @escaping (LeaseMilesEntry) -> ()) {
-        let entry = loadLeaseData()
+        let entry = loadLeaseData(context: context)
         completion(entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<LeaseMilesEntry>) -> ()) {
-        let entry = loadLeaseData()
+        let entry = loadLeaseData(context: context)
         
         // Update every hour
         let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date()
@@ -42,7 +43,7 @@ struct LeaseMilesProvider: TimelineProvider {
         completion(timeline)
     }
     
-    private func loadLeaseData() -> LeaseMilesEntry {
+    private func loadLeaseData(context: Context) -> LeaseMilesEntry {
         guard let widgetData = SharedDataManager.shared.getWidgetData() else {
             return LeaseMilesEntry(
                 date: Date(),
@@ -50,7 +51,8 @@ struct LeaseMilesProvider: TimelineProvider {
                 remainingMiles: 0,
                 monthsLeft: 0,
                 projectedOverage: 0,
-                isDataAvailable: false
+                isDataAvailable: false,
+                configuration: nil
             )
         }
         
@@ -60,7 +62,8 @@ struct LeaseMilesProvider: TimelineProvider {
             remainingMiles: widgetData.remainingMiles,
             monthsLeft: widgetData.monthsLeft,
             projectedOverage: widgetData.projectedOverage,
-            isDataAvailable: true
+            isDataAvailable: true,
+            configuration: context.configuration as? LeaseMilesWidgetConfiguration
         )
     }
 }
@@ -72,23 +75,25 @@ struct LeaseMilesEntry: TimelineEntry {
     let monthsLeft: Int
     let projectedOverage: Int
     let isDataAvailable: Bool
+    let configuration: LeaseMilesWidgetConfiguration?
 }
 
 struct LeaseMilesWidgetEntryView: View {
     var entry: LeaseMilesProvider.Entry
     @Environment(\.widgetFamily) var family
+    var configuration: LeaseMilesWidgetConfiguration?
 
     var body: some View {
         if entry.isDataAvailable {
             switch family {
             case .systemSmall:
-                SmallWidgetView(entry: entry)
+                SmallWidgetView(entry: entry, configuration: configuration)
             case .systemMedium:
-                MediumWidgetView(entry: entry)
+                MediumWidgetView(entry: entry, configuration: configuration)
             case .systemLarge:
-                LargeWidgetView(entry: entry)
+                LargeWidgetView(entry: entry, configuration: configuration)
             default:
-                SmallWidgetView(entry: entry)
+                SmallWidgetView(entry: entry, configuration: configuration)
             }
         } else {
             NoDataView()
@@ -98,6 +103,11 @@ struct LeaseMilesWidgetEntryView: View {
 
 struct SmallWidgetView: View {
     let entry: LeaseMilesEntry
+    let configuration: LeaseMilesWidgetConfiguration?
+    
+    private var showProjectedOverage: Bool {
+        configuration?.showProjectedOverage?.boolValue ?? true
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -124,7 +134,7 @@ struct SmallWidgetView: View {
                     .font(.caption)
                     .foregroundColor(entry.remainingMiles > 0 ? .green : .red)
                 
-                if entry.projectedOverage > 0 {
+                if showProjectedOverage && entry.projectedOverage > 0 {
                     Text("⚠️ \(entry.projectedOverage.formatted)")
                         .font(.caption)
                         .foregroundColor(.red)
@@ -140,6 +150,15 @@ struct SmallWidgetView: View {
 
 struct MediumWidgetView: View {
     let entry: LeaseMilesEntry
+    let configuration: LeaseMilesWidgetConfiguration?
+    
+    private var showProjectedOverage: Bool {
+        configuration?.showProjectedOverage?.boolValue ?? true
+    }
+    
+    private var showMonthsLeft: Bool {
+        configuration?.showMonthsLeft?.boolValue ?? true
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -176,13 +195,15 @@ struct MediumWidgetView: View {
             }
             
             HStack {
-                Text("\(entry.monthsLeft) months left")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if showMonthsLeft {
+                    Text("\(entry.monthsLeft) months left")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                 
                 Spacer()
                 
-                if entry.projectedOverage > 0 {
+                if showProjectedOverage && entry.projectedOverage > 0 {
                     Text("⚠️ \(entry.projectedOverage.formatted) over")
                         .font(.caption)
                         .foregroundColor(.red)
@@ -198,6 +219,23 @@ struct MediumWidgetView: View {
 
 struct LargeWidgetView: View {
     let entry: LeaseMilesEntry
+    let configuration: LeaseMilesWidgetConfiguration?
+    
+    private var showProjectedOverage: Bool {
+        configuration?.showProjectedOverage?.boolValue ?? true
+    }
+    
+    private var showMonthsLeft: Bool {
+        configuration?.showMonthsLeft?.boolValue ?? true
+    }
+    
+    private var showRunningCost: Bool {
+        configuration?.showRunningCost?.boolValue ?? false
+    }
+    
+    private var displayStyle: DisplayStyle {
+        configuration?.displayStyle ?? .compact
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -210,29 +248,69 @@ struct LargeWidgetView: View {
                 Spacer()
             }
             
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(entry.milesDriven.formatted)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    Text("Miles Driven")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(entry.remainingMiles.formatted)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(entry.remainingMiles > 0 ? .green : .red)
-                    Text("Remaining")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
+            if displayStyle == .minimal {
+                minimalView
+            } else if displayStyle == .detailed {
+                detailedView
+            } else {
+                compactView
+            }
+            
+            Spacer()
+        }
+        .padding()
+    }
+    
+    private var minimalView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("\(entry.milesDriven.formatted)")
+                    .font(.title)
+                    .fontWeight(.bold)
+                Text("miles driven")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            
+            HStack {
+                Text("\(entry.remainingMiles.formatted)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(entry.remainingMiles > 0 ? .green : .red)
+                Text("remaining")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+        }
+    }
+    
+    private var compactView: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible()),
+            GridItem(.flexible())
+        ], spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(entry.milesDriven.formatted)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                Text("Miles Driven")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(entry.remainingMiles.formatted)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(entry.remainingMiles > 0 ? .green : .red)
+                Text("Remaining")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            if showMonthsLeft {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(entry.monthsLeft)")
                         .font(.title2)
@@ -241,7 +319,9 @@ struct LargeWidgetView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+            }
+            
+            if showProjectedOverage {
                 VStack(alignment: .leading, spacing: 4) {
                     if entry.projectedOverage > 0 {
                         Text("\(entry.projectedOverage.formatted)")
@@ -262,10 +342,53 @@ struct LargeWidgetView: View {
                     }
                 }
             }
-            
-            Spacer()
         }
-        .padding()
+    }
+    
+    private var detailedView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(entry.milesDriven.formatted)")
+                        .font(.title)
+                        .fontWeight(.bold)
+                    Text("Miles Driven")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("\(entry.remainingMiles.formatted)")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .foregroundColor(entry.remainingMiles > 0 ? .green : .red)
+                    Text("Remaining")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            if showMonthsLeft || showProjectedOverage {
+                HStack {
+                    if showMonthsLeft {
+                        Text("\(entry.monthsLeft) months left")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    if showProjectedOverage && entry.projectedOverage > 0 {
+                        Text("⚠️ \(entry.projectedOverage.formatted) projected over")
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+                            .fontWeight(.semibold)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -295,7 +418,8 @@ struct NoDataView: View {
         remainingMiles: 21000,
         monthsLeft: 18,
         projectedOverage: 0,
-        isDataAvailable: true
+        isDataAvailable: true,
+        configuration: nil
     )
     LeaseMilesEntry(
         date: .now,
@@ -303,6 +427,7 @@ struct NoDataView: View {
         remainingMiles: 11000,
         monthsLeft: 12,
         projectedOverage: 5000,
-        isDataAvailable: true
+        isDataAvailable: true,
+        configuration: nil
     )
 }
