@@ -5,5 +5,6 @@ import SwiftUI
 struct LeaseMilesWidgetBundle: WidgetBundle {
     var body: some Widget {
         LeaseMilesWidget()
+        InteractiveWidget()
     }
 }
