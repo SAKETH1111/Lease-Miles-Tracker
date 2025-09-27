@@ -96,4 +96,52 @@ class NotificationManager: ObservableObject {
             }
         }
     }
+    
+    func sendTestNotification() {
+        guard authorizationStatus == .authorized else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = "Test Notification"
+        content.body = "This is a test notification from Lease Miles Tracker!"
+        content.sound = .default
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "test-notification", content: content, trigger: trigger)
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Error sending test notification: \(error)")
+            }
+        }
+    }
+    
+    func scheduleTestReminder(seconds: Int = 5) {
+        guard authorizationStatus == .authorized else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = "Test Reminder"
+        content.body = "This is a test reminder scheduled \(seconds) seconds ago!"
+        content.sound = .default
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(seconds), repeats: false)
+        let request = UNNotificationRequest(identifier: "test-reminder", content: content, trigger: trigger)
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Error scheduling test reminder: \(error)")
+            }
+        }
+    }
+    
+    func cancelTestReminder() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["test-reminder"])
+    }
+    
+    func getPendingNotifications() async -> [UNNotificationRequest] {
+        return await UNUserNotificationCenter.current().pendingNotificationRequests()
+    }
+    
+    func getDeliveredNotifications() async -> [UNNotification] {
+        return await UNUserNotificationCenter.current().deliveredNotifications()
+    }
 }
