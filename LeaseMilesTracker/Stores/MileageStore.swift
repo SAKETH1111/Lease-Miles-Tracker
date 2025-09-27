@@ -9,15 +9,23 @@ class MileageStore: ObservableObject {
         self.modelContext = modelContext
     }
     
-    func loadEntries() -> [MileageEntry] {
+    func loadEntries(for car: Car) -> [MileageEntry] {
+        let descriptor = FetchDescriptor<MileageEntry>(
+            predicate: #Predicate<MileageEntry> { $0.car?.id == car.id },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+    
+    func loadAllEntries() -> [MileageEntry] {
         let descriptor = FetchDescriptor<MileageEntry>(
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
         return (try? modelContext.fetch(descriptor)) ?? []
     }
     
-    func addEntry(date: Date, odometer: Int, notes: String?) {
-        let entry = MileageEntry(date: date, odometer: odometer, notes: notes)
+    func addEntry(date: Date, odometer: Int, notes: String?, car: Car) {
+        let entry = MileageEntry(date: date, odometer: odometer, notes: notes, car: car)
         modelContext.insert(entry)
         
         do {
@@ -49,8 +57,18 @@ class MileageStore: ObservableObject {
         }
     }
     
+    func getLatestOdometer(for car: Car) -> Int? {
+        let entries = loadEntries(for: car)
+        return entries.max(by: { $0.date < $1.date })?.odometer
+    }
+    
+    // Legacy method for backward compatibility
+    func loadEntries() -> [MileageEntry] {
+        return loadAllEntries()
+    }
+    
     func getLatestOdometer() -> Int? {
-        let entries = loadEntries()
+        let entries = loadAllEntries()
         return entries.max(by: { $0.date < $1.date })?.odometer
     }
 }
