@@ -3,8 +3,8 @@ import SwiftData
 
 struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \MileageEntry.date, order: .reverse) private var entries: [MileageEntry]
-    @Query private var settings: [LeaseSettings]
+    @Query private var cars: [Car]
+    @Query(sort: \MileageEntry.date, order: .reverse) private var allEntries: [MileageEntry]
     
     @State private var showingAddEntry = false
     @State private var showingEditEntry: MileageEntry?
@@ -13,58 +13,50 @@ struct HistoryView: View {
     @State private var showingShareSheet = false
     @State private var csvFileURL: URL?
     
+    private var carStore: CarStore {
+        CarStore(modelContext: modelContext)
+    }
+    
     private var mileageStore: MileageStore {
         MileageStore(modelContext: modelContext)
+    }
+    
+    private var activeCar: Car? {
+        cars.first { $0.isActive }
+    }
+    
+    private var entries: [MileageEntry] {
+        guard let activeCar = activeCar else { return [] }
+        return mileageStore.loadEntries(for: activeCar)
     }
     
     var body: some View {
         NavigationView {
             Group {
-                if entries.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "clock")
-                            .font(.system(size: 60))
-                            .foregroundColor(.secondary)
-                        
-                        Text("No Entries Yet")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        
-                        Text("Add your first odometer reading to get started.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                        
-                        Button("Add Entry") {
-                            showingAddEntry = true
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
+                if activeCar == nil {
+                    noCarStateView
+                } else if entries.isEmpty {
+                    noEntriesStateView
                 } else {
-                    List {
-                        ForEach(entries) { entry in
-                            EntryRowView(
-                                entry: entry,
-                                previousEntry: getPreviousEntry(for: entry)
-                            )
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button("Delete", role: .destructive) {
-                                    entryToDelete = entry
-                                    showingDeleteAlert = true
-                                }
-                                
-                                Button("Edit") {
-                                    showingEditEntry = entry
-                                }
-                                .tint(.blue)
-                            }
-                        }
-                    }
+                    entriesListView
                 }
             }
             .navigationTitle("History")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        // Show car selection or current car info
+                    } label: {
+                        HStack {
+                            Image(systemName: "car.circle.fill")
+                            if let activeCar = activeCar {
+                                Text(activeCar.displayName)
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack {
                         if !entries.isEmpty {
@@ -75,16 +67,20 @@ struct HistoryView: View {
                             }
                         }
                         
-                        Button {
-                            showingAddEntry = true
-                        } label: {
-                            Image(systemName: "plus")
+                        if activeCar != nil {
+                            Button {
+                                showingAddEntry = true
+                            } label: {
+                                Image(systemName: "plus")
+                            }
                         }
                     }
                 }
             }
             .sheet(isPresented: $showingAddEntry) {
-                AddEntryView()
+                if let activeCar = activeCar {
+                    AddEntryView(car: activeCar)
+                }
             }
             .sheet(item: $showingEditEntry) { entry in
                 EditEntryView(entry: entry)
@@ -103,6 +99,69 @@ struct HistoryView: View {
             .sheet(isPresented: $showingShareSheet) {
                 if let csvFileURL = csvFileURL {
                     ShareSheet(activityItems: [csvFileURL])
+                }
+            }
+        }
+    }
+    
+    private var noCarStateView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "car.circle")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
+            
+            Text("No Active Car")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            Text("Select a car from your garage to view its history")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+    }
+    
+    private var noEntriesStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "clock")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
+            
+            Text("No Entries Yet")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            Text("Add your first odometer reading to get started.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            
+            Button("Add Entry") {
+                showingAddEntry = true
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding()
+    }
+    
+    private var entriesListView: some View {
+        List {
+            ForEach(entries) { entry in
+                EntryRowView(
+                    entry: entry,
+                    previousEntry: getPreviousEntry(for: entry)
+                )
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button("Delete", role: .destructive) {
+                        entryToDelete = entry
+                        showingDeleteAlert = true
+                    }
+                    
+                    Button("Edit") {
+                        showingEditEntry = entry
+                    }
+                    .tint(.blue)
                 }
             }
         }
