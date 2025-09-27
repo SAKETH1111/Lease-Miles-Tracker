@@ -7,6 +7,7 @@ struct DashboardView: View {
     @Query private var entries: [MileageEntry]
     @State private var showingAddEntry = false
     @State private var showingOnboarding = false
+    @State private var showingNotificationTest = false
     
     private var settingsStore: LeaseSettingsStore {
         LeaseSettingsStore(modelContext: modelContext)
@@ -103,19 +104,35 @@ struct DashboardView: View {
             .navigationTitle("Dashboard")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingAddEntry = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
+                    HStack {
+                        Button {
+                            showingNotificationTest = true
+                        } label: {
+                            Image(systemName: "bell.badge")
+                        }
+                        
+                        Button {
+                            showingAddEntry = true
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                        }
                     }
                 }
             }
             .sheet(isPresented: $showingAddEntry) {
                 AddEntryView()
             }
+            .sheet(isPresented: $showingNotificationTest) {
+                NotificationTestView()
+            }
             .onAppear {
                 if settings.isEmpty {
                     showingOnboarding = true
+                } else {
+                    // Update widget data when dashboard appears
+                    if let leaseSettings = settings.first {
+                        SharedDataManager.shared.updateWidgetData(settings: leaseSettings, entries: entries)
+                    }
                 }
             }
             .sheet(isPresented: $showingOnboarding) {
