@@ -17,7 +17,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>1.0.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -61,7 +61,7 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSUserNotificationsUsageDescription</key>
-	<string>This app sends reminders to update your odometer reading and alerts when you're approaching your lease mileage limit.</string>
+	<string>Lease Miles Tracker sends reminders to update your odometer reading and alerts when you're approaching your lease mileage limit to help you avoid costly overage charges.</string>
 	<key>NSUbiquitousContainers</key>
 	<dict>
 		<key>group.com.leasemilestracker.shared</key>
@@ -75,6 +75,27 @@
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.com.leasemilestracker.shared</string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Lease Miles Tracker can save exported CSV files and screenshots to your photo library for easy sharing.</string>
+	<key>NSDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>CSV Document</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.comma-separated-values-text</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>
