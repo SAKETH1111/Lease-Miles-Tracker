@@ -1,8 +1,10 @@
 import SwiftUI
 import SwiftData
 
-struct OnboardingView: View {
+struct AddCarView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    
     @State private var name = ""
     @State private var make = ""
     @State private var model = ""
@@ -15,12 +17,20 @@ struct OnboardingView: View {
     @State private var costPerMile = ""
     @State private var reminderDayOfMonth = ""
     @State private var lowMilesThresholdPercent = "90"
-    @State private var showingAlert = false
-    @State private var alertMessage = ""
-    @State private var isNotificationEnabled = false
+    @State private var isActive = true
     
     private var carStore: CarStore {
         CarStore(modelContext: modelContext)
+    }
+    
+    private var isValid: Bool {
+        !name.isEmpty && 
+        !startingOdometer.isEmpty && 
+        !allowedMilesTotal.isEmpty && 
+        !costPerMile.isEmpty &&
+        Int(startingOdometer) != nil &&
+        Int(allowedMilesTotal) != nil &&
+        Decimal(string: costPerMile) != nil
     }
     
     var body: some View {
@@ -49,85 +59,49 @@ struct OnboardingView: View {
                 Section("Lease Details") {
                     DatePicker("Lease Start Date", selection: $leaseStartDate, displayedComponents: .date)
                     DatePicker("Lease End Date", selection: $leaseEndDate, displayedComponents: .date)
-                }
-                
-                Section("Odometer") {
+                    
                     TextField("Starting Odometer *", text: $startingOdometer)
                         .keyboardType(.numberPad)
-                }
-                
-                Section("Mileage Allowance") {
+                    
                     TextField("Allowed Miles Total *", text: $allowedMilesTotal)
                         .keyboardType(.numberPad)
-                }
-                
-                Section("Cost") {
+                    
                     TextField("Cost Per Mile ($) *", text: $costPerMile)
                         .keyboardType(.decimalPad)
                 }
                 
                 Section("Notifications") {
-                    Toggle("Enable Monthly Reminders", isOn: $isNotificationEnabled)
+                    TextField("Reminder Day of Month (1-31)", text: $reminderDayOfMonth)
+                        .keyboardType(.numberPad)
                     
-                    if isNotificationEnabled {
-                        TextField("Day of Month (1-28)", text: $reminderDayOfMonth)
-                            .keyboardType(.numberPad)
+                    TextField("Low Miles Threshold (%)", text: $lowMilesThresholdPercent)
+                        .keyboardType(.numberPad)
+                }
+                
+                Section("Settings") {
+                    Toggle("Set as Active Car", isOn: $isActive)
+                }
+            }
+            .navigationTitle("Add New Car")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
                     }
                 }
                 
-                Section("Threshold") {
-                    TextField("Low Miles Threshold %", text: $lowMilesThresholdPercent)
-                        .keyboardType(.numberPad)
-                }
-            }
-            .navigationTitle("Add Your First Car")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
                         saveCar()
                     }
-                    .disabled(!isValidInput)
+                    .disabled(!isValid)
                 }
             }
-            .alert("Error", isPresented: $showingAlert) {
-                Button("OK") { }
-            } message: {
-                Text(alertMessage)
-            }
         }
-    }
-    
-    private var isValidInput: Bool {
-        return !name.isEmpty &&
-               !startingOdometer.isEmpty &&
-               !allowedMilesTotal.isEmpty &&
-               !costPerMile.isEmpty &&
-               Int(startingOdometer) != nil &&
-               Int(allowedMilesTotal) != nil &&
-               Double(costPerMile) != nil &&
-               leaseEndDate > leaseStartDate
     }
     
     private func saveCar() {
-        guard let startingOdometerInt = Int(startingOdometer),
-              let allowedMilesTotalInt = Int(allowedMilesTotal),
-              let costPerMileDouble = Double(costPerMile),
-              leaseEndDate > leaseStartDate else {
-            alertMessage = "Please fill in all required fields with valid values."
-            showingAlert = true
-            return
-        }
-        
-        let reminderDay = isNotificationEnabled ? Int(reminderDayOfMonth) : nil
-        let thresholdPercent = Int(lowMilesThresholdPercent) ?? 90
-        
-        if let reminderDay = reminderDay, (reminderDay < 1 || reminderDay > 28) {
-            alertMessage = "Reminder day must be between 1 and 28."
-            showingAlert = true
-            return
-        }
-        
         let newCar = Car(
             name: name,
             make: make.isEmpty ? nil : make,
@@ -136,24 +110,25 @@ struct OnboardingView: View {
             color: color.isEmpty ? nil : color,
             leaseStartDate: leaseStartDate,
             leaseEndDate: leaseEndDate,
-            startingOdometer: startingOdometerInt,
-            allowedMilesTotal: allowedMilesTotalInt,
-            costPerMile: Decimal(costPerMileDouble),
-            reminderDayOfMonth: reminderDay,
-            lowMilesThresholdPercent: thresholdPercent,
-            isActive: true
+            startingOdometer: Int(startingOdometer) ?? 0,
+            allowedMilesTotal: Int(allowedMilesTotal) ?? 36000,
+            costPerMile: Decimal(string: costPerMile) ?? 0.25,
+            reminderDayOfMonth: reminderDayOfMonth.isEmpty ? nil : Int(reminderDayOfMonth),
+            lowMilesThresholdPercent: Int(lowMilesThresholdPercent) ?? 90,
+            isActive: isActive
         )
         
         carStore.addCar(newCar)
         
-        // Request notification permission if enabled
-        if isNotificationEnabled {
-            Task {
-                let granted = await NotificationManager.shared.requestPermission()
-                if granted, let day = reminderDay {
-                    NotificationManager.shared.scheduleMonthlyReminder(dayOfMonth: day)
-                }
-            }
+        if isActive {
+            carStore.setActiveCar(newCar)
         }
+        
+        dismiss()
     }
+}
+
+#Preview {
+    AddCarView()
+        .modelContainer(for: [Car.self, MileageEntry.self])
 }

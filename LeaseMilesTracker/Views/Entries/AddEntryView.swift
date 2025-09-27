@@ -4,8 +4,8 @@ import SwiftData
 struct AddEntryView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query private var settings: [LeaseSettings]
-    @Query private var entries: [MileageEntry]
+    
+    let car: Car
     
     @State private var date = Date()
     @State private var odometer = ""
@@ -17,9 +17,22 @@ struct AddEntryView: View {
         MileageStore(modelContext: modelContext)
     }
     
+    private var entriesForCar: [MileageEntry] {
+        mileageStore.loadEntries(for: car)
+    }
+    
     var body: some View {
         NavigationView {
             Form {
+                Section("Car") {
+                    HStack {
+                        Image(systemName: "car.circle.fill")
+                            .foregroundColor(.blue)
+                        Text(car.displayName)
+                            .font(.headline)
+                    }
+                }
+                
                 Section("Entry Details") {
                     DatePicker("Date", selection: $date, displayedComponents: .date)
                     
@@ -61,18 +74,17 @@ struct AddEntryView: View {
     }
     
     private func saveEntry() {
-        guard let odometerInt = Int(odometer),
-              let leaseSettings = settings.first else {
+        guard let odometerInt = Int(odometer) else {
             alertMessage = "Invalid odometer reading."
             showingAlert = true
             return
         }
         
-        let latestOdometer = mileageStore.getLatestOdometer() ?? leaseSettings.startingOdometer
+        let latestOdometer = mileageStore.getLatestOdometer(for: car) ?? car.startingOdometer
         let validation = LeaseCalculator.validateOdometerEntry(
             newOdometer: odometerInt,
             previousOdometer: latestOdometer,
-            startingOdometer: leaseSettings.startingOdometer
+            startingOdometer: car.startingOdometer
         )
         
         switch validation {
@@ -87,7 +99,8 @@ struct AddEntryView: View {
         let entry = MileageEntry(
             date: date,
             odometer: odometerInt,
-            notes: notes.isEmpty ? nil : notes
+            notes: notes.isEmpty ? nil : notes,
+            car: car
         )
         
         modelContext.insert(entry)
@@ -96,11 +109,12 @@ struct AddEntryView: View {
             try modelContext.save()
             
             // Check if we should send a threshold alert
-            let snapshot = LeaseCalculator.calculateSnapshot(settings: leaseSettings, entries: entries + [entry])
-            if LeaseCalculator.shouldShowWarning(settings: leaseSettings, snapshot: snapshot) {
+            let updatedEntries = entriesForCar + [entry]
+            let snapshot = LeaseCalculator.calculateSnapshot(settings: car.leaseSettings, entries: updatedEntries)
+            if LeaseCalculator.shouldShowWarning(settings: car.leaseSettings, snapshot: snapshot) {
                 NotificationManager.shared.sendThresholdAlert(
                     milesDriven: snapshot.milesDriven,
-                    thresholdPercent: leaseSettings.lowMilesThresholdPercent,
+                    thresholdPercent: car.lowMilesThresholdPercent,
                     projectedOverage: snapshot.projectedOverage
                 )
             }
@@ -111,4 +125,10 @@ struct AddEntryView: View {
             showingAlert = true
         }
     }
+}
+
+#Preview {
+    let car = Car(name: "Test Car", make: "Toyota", model: "Camry", year: 2023)
+    return AddEntryView(car: car)
+        .modelContainer(for: [Car.self, MileageEntry.self])
 }

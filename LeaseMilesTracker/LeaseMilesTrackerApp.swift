@@ -7,7 +7,7 @@ struct LeaseMilesTrackerApp: App {
     
     init() {
         do {
-            modelContainer = try ModelContainer(for: LeaseSettings.self, MileageEntry.self)
+            modelContainer = try ModelContainer(for: Car.self, MileageEntry.self, LeaseSettings.self)
         } catch {
             fatalError("Could not initialize ModelContainer: \(error)")
         }
@@ -23,15 +23,23 @@ struct LeaseMilesTrackerApp: App {
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var settings: [LeaseSettings]
+    @Query private var cars: [Car]
+    
+    private var carStore: CarStore {
+        CarStore(modelContext: modelContext)
+    }
     
     var body: some View {
         Group {
-            if settings.isEmpty || !settings.first!.isComplete {
+            if cars.isEmpty {
                 OnboardingView()
             } else {
                 MainTabView()
             }
+        }
+        .onAppear {
+            // Migrate from old data if needed
+            carStore.migrateFromOldData()
         }
     }
 }
@@ -49,6 +57,12 @@ struct MainTabView: View {
                 .tabItem {
                     Image(systemName: "clock")
                     Text("History")
+                }
+            
+            CarSelectionView()
+                .tabItem {
+                    Image(systemName: "car.circle")
+                    Text("Cars")
                 }
             
             SettingsView()
